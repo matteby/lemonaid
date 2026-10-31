@@ -112,7 +112,7 @@ than refusing to start.
 
 ## Cursors
 
-Every watcher (`doc`, `pr`, `file` and `briefs`) compares what it watches with a saved
+Every watcher (`doc`, `pr`, `repo`, `file`, `slack` and `briefs`) compares what it watches with a saved
 record of what it last reported to the lemon, its cursor, and reports what differs. So a
 push, comment or edit made while no waiter ran is reported by the next waiter, and nothing
 is reported twice.
@@ -353,6 +353,20 @@ message reported, kept per channel and thread in the lemon's [cursors](#cursors)
 rearmed waiter reports what arrived in between. One waiter per channel, thread and lemon may
 run; `--once`, `--codex-thread`, `--status` and `--state-dir` work as in `watch pr`.
 
+As a `## Watching` line it is read like `watch repo`: the unified watcher polls it in the
+push scout, and its events join the batch. An unlisted channel, a missing token or a token
+Slack refuses is told to the lemon once, and retried each interval. A thread watch has no
+end; remove its line with `lemonaid brief watching rm` when the conversation is over. Stop a
+running waiter with `lemonaid watch stop --self slack <channel>`, or `... slack <ts>` for a
+thread.
+
+```markdown
+## Watching
+
+- `lemonaid watch slack --wait my-hq --me "🍋 LemonAce"`
+- `lemonaid watch slack --wait my-hq --thread 1712345678.123456 --me "🍋 LemonAce"`
+```
+
 ### Setting up Slack
 
 1. Create a Slack app for your workspace at <https://api.slack.com/apps>, with the user
@@ -579,7 +593,7 @@ The rows and commands declare these sources:
 
 | Source | What the unified watcher watches |
 |---|---|
-| `## Watching` | Supported `watch pr`, `doc`, `file` and `briefs` commands, using their supplied options. These are declarations, not shell commands to execute. |
+| `## Watching` | Supported `watch pr`, `repo`, `doc`, `file`, `slack` and `briefs` commands, using their supplied options. These are declarations, not shell commands to execute. |
 | `### PRs` | Each PR with comments enabled, regardless of whether an explicit watch line omitted that flag. A pass is reported as `ci-green` after CI was seen running or failed, and otherwise only for an explicit `--ci` line. Each PR wakes only for the events its role needs; see [Roles](#roles). |
 | A PR's Review cell | A local review document's unanswered comments and body edits, whatever its Docs row says, because reviewers write findings and verdicts in the body. Obsidian links resolve through configured vault roots. |
 | `### Docs` | Unanswered comments on each document; `Watch: All edits` also watches the body. Documents remain watched while the session exists, including when its brief says `Status: done`. |

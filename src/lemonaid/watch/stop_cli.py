@@ -10,9 +10,10 @@ from ..inbox import db
 from . import brief_record, own_edits, registry, stopping
 
 _HELP = """\
-Stop your own running waiters of any kind - inbox watch, watch pr, doc, file and
-briefs - and remove each from your brief's `## Waiters`. With no KIND, stops all
-of them; with a KIND and TARGET (a PR number, a path, a Lemon-ID), only that one.
+Stop your own running waiters of any kind - inbox watch, watch pr, repo, doc, file,
+slack and briefs - and remove each from your brief's `## Waiters`. With no KIND, stops
+all of them; with a KIND and TARGET (a PR number, a path, a Lemon-ID, a Slack channel
+or thread ts), only that one.
 
 Only waiters started by this version of lemonaid or later, with a lemon identity
 (a harness session or --channel), are known; stop any other by its task or pid. Never `pkill -f` a waiter command: the pattern matches

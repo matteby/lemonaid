@@ -1041,7 +1041,7 @@ Bare URLs and vault paths in a bullet become short links, as in the brief view.
 root, which becomes an `obsidian://` link. `pr` and `doc` edit either layout and create
 level-2 sections when missing.
 
-With an attached brief, `watch doc`, `watch pr`, `watch repo`, `watch file`, and `watch briefs` automatically
+With an attached brief, `watch doc`, `watch pr`, `watch repo`, `watch file`, `watch slack`, and `watch briefs` automatically
 record their commands as invoked under `## Watching` after startup checks pass, without
 inserting omitted defaults or temporary state paths. Rearms update
 the same entry; it stays across one-shot events. With `--codex-thread`, recording uses the
@@ -1236,7 +1236,7 @@ described in [Codex setup](codex.md#3-allow-brief-and-message-commands-under-the
 ### Stopping your waiters
 
 `lemonaid watch stop --self` stops every waiter you started (`inbox watch`, `watch pr`,
-`doc`, `file` and `briefs`) and removes each from your brief's `## Watching`. Name one to stop
+`repo`, `doc`, `file`, `slack` and `briefs`) and removes each from your brief's `## Watching`. Name one to stop
 only that: `lemonaid watch stop --self pr 12`, `... doc <path>`, `... inbox`. Each waiter
 registers under your channel while it runs and holds that entry locked, so `stop` signals
 only processes that are still your waiters. A waiter started before lemonaid 0.90.1 isn't
@@ -1331,7 +1331,8 @@ again by that removal.
 a new top-level message in a Slack channel, or with `--thread`, a new reply in that thread.
 The channel must be listed in `[slack.channels]` in the user's config. Messages starting with
 your `--me` signature are skipped, so sign each Slack post you make. Each line gives the
-message's `ts`; reply in its thread with that `ts`. Details: [watch.md](watch.md#watching-slack).
+message's `ts`; reply in its thread with that `ts`. As a `## Watching` line it joins your
+batch like the other sources. Details: [watch.md](watch.md#watching-slack).
 
 ## Watching children
 

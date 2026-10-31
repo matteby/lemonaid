@@ -8,7 +8,7 @@ from collections import abc
 from pathlib import Path
 
 from ..brief import doc_table, identity, lemon_table, output_doc, pr_table, sections, waiters
-from . import briefs_cli, doc_cli, file_cli, pr_cli, repo_cli, roles
+from . import briefs_cli, doc_cli, file_cli, pr_cli, repo_cli, roles, slack_cli
 
 
 class Problem(ValueError):
@@ -72,7 +72,7 @@ def _parse(command: str, parent: str, me: str, cwd: Path) -> Subscription | None
 
     parser = _Parser(allow_abbrev=False)
     sub = parser.add_subparsers(dest="kind", required=True)
-    for module in (doc_cli, file_cli, pr_cli, repo_cli, briefs_cli):
+    for module in (doc_cli, file_cli, pr_cli, repo_cli, briefs_cli, slack_cli):
         module.add_parser(sub)
     args = parser.parse_args(words[2:])
     if args.status or not getattr(args, "wait", True):
@@ -87,6 +87,8 @@ def _parse(command: str, parent: str, me: str, cwd: Path) -> Subscription | None
         target = (repo, str(number))
     elif kind == "repo":
         target = (args.wait,)
+    elif kind == "slack":
+        target = (args.wait.lstrip("#"), *([args.thread] if args.thread else []))
     elif kind == "briefs":
         target = (parent if args.use_self else args.lemon,)
     else:

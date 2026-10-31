@@ -33,7 +33,7 @@ import time
 from .. import slack_config
 from ..config import load_config
 from ..log import get_logger
-from . import cursors, delivery, registry, slack_api, slack_events, waiter_lock
+from . import brief_record, cursors, delivery, registry, slack_api, slack_events, waiter_lock
 
 _log = get_logger("watch.slack")
 _MAX_DELAY = 600.0
@@ -124,6 +124,11 @@ def run(a: argparse.Namespace) -> int:
         client, base = open_client(config)
     except (slack_config.TokenError, slack_api.Rejected) as error:
         print(f"not started: {error}")
+        return 2
+
+    if error := brief_record.record(a, "slack", a.codex_thread):
+        print(f"not started: could not record waiter: {error}")
+        lock.close()
         return 2
 
     once = a.once or bool(a.codex_thread)

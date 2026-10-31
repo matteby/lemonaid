@@ -4,6 +4,7 @@ No test calls Slack or reads a real token.
 """
 
 import argparse
+import datetime
 import io
 import json
 import subprocess
@@ -12,14 +13,20 @@ import urllib.error
 import pytest
 
 from lemonaid import config, slack_config
+from lemonaid.brief import attached, store, waiters
+from lemonaid.inbox import db
 from lemonaid.watch import (
     cli,
     delivery,
     registry,
+    scout_pollers,
     slack_api,
     slack_cli,
     slack_events,
+    subscriptions,
 )
+
+from .wait import shared
 
 CHANNEL = "C0123ABCDEF"
 THREAD = "1712345678.123456"
@@ -474,3 +481,81 @@ def test_stop_matches_a_channel_by_name_or_id_and_a_thread_by_ts():
     assert slack_cli.targets(CHANNEL, "my-hq", "") == (CHANNEL, "my-hq")
     assert THREAD in slack_cli.targets(CHANNEL, "my-hq", THREAD)
     assert "slack" in registry.KINDS
+
+
+# In a brief
+
+
+def test_a_watching_line_is_read_as_a_slack_subscription(tmp_path):
+    spec = subscriptions._parse(
+        f'lemonaid watch slack --wait "#my-hq" --thread {THREAD} --me "🍋 LemonAce" --once',
+        "p.Wordy",
+        "Author (Wordy)",
+        tmp_path,
+    )
+
+    assert spec.kind == "slack" and spec.target == ("my-hq", THREAD)
+    assert spec.me == "🍋 LemonAce" and spec.interval == 60
+
+
+def test_a_watching_bullet_is_a_slack_subscription_without_problems(tmp_path):
+    text = shared.BRIEF + "- `lemonaid watch slack --wait my-hq`\n"
+
+    reading = subscriptions.report(text, tmp_path)
+
+    assert not reading.problems
+    assert [s.target for s in reading.specs if s.kind == "slack"] == [("my-hq",)]
+
+
+def test_the_scout_polls_a_slack_subscription(allowed, tmp_path, monkeypatch):
+    client = FakeClient([_m("100.000001")])
+    monkeypatch.setattr(slack_cli, "make_client", lambda token: client)
+    spec = subscriptions.Subscription("slack", ("my-hq",), "🍋 LemonAce", interval=60)
+    got = []
+    poll = scout_pollers.open_poller(spec, tmp_path / "cursors", "", got.append, ())
+
+    poll()
+    client.messages += [_m("200.0", "🍋 LemonAce: mine"), _m("300.0", "yours")]
+    poll()
+
+    [event] = got
+    assert '"yours"' in event and "mine" not in event
+
+
+def test_the_scout_backs_off_after_a_failed_read(allowed, tmp_path, monkeypatch):
+    client = FakeClient([_m("100.000001")])
+    monkeypatch.setattr(slack_cli, "make_client", lambda token: client)
+    spec = subscriptions.Subscription("slack", ("my-hq",), interval=60)
+    poll = scout_pollers.open_poller(spec, tmp_path / "cursors", "", lambda m: True, ())
+    client.fail = slack_api.Unavailable("rate limited", 120)
+
+    poll()
+    poll()
+
+    assert len(client.calls) == 1
+
+
+def test_the_scout_refuses_an_unlisted_channel(allowed, tmp_path):
+    spec = subscriptions.Subscription("slack", ("C0456GHIJKL",), interval=60)
+
+    with pytest.raises(ValueError, match=r"slack\.channels"):
+        scout_pollers.open_poller(spec, tmp_path / "cursors", "", lambda m: True, ())
+
+
+def test_a_started_waiter_records_its_command_in_the_brief(allowed, monkeypatch):
+    path = store.create("watching", datetime.date(2026, 10, 30))
+    with db.connect() as conn:
+        attached.attach(conn, "codex:owner", path)
+    monkeypatch.setenv("LEMONAID_CHANNEL", "codex:owner")
+    client = FakeClient([_m("100.000001")])
+    monkeypatch.setattr(slack_cli, "make_client", lambda token: client)
+    monkeypatch.setattr(
+        slack_cli.time, "sleep", lambda s: client.messages.append(_m(f"{len(client.calls)}00.0"))
+    )
+    a = _args("--wait", "my-hq", "--me", "🍋 LemonAce", "--once")
+
+    assert slack_cli.run(a) == 0
+    assert slack_cli.run(a) == 0
+    assert waiters.commands(path.read_text()) == [
+        "lemonaid watch slack --wait my-hq --me '🍋 LemonAce' --once"
+    ]

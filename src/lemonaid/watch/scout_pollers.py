@@ -4,7 +4,7 @@ import time
 from collections import abc
 from pathlib import Path
 
-from .. import pr_url, watch_config
+from .. import pr_url, slack_config, watch_config
 from ..config import load_config
 from ..log import get_logger
 from . import (
@@ -24,6 +24,9 @@ from . import (
     repo_activity,
     repo_events,
     roles,
+    slack_api,
+    slack_cli,
+    slack_events,
     subscriptions,
 )
 
@@ -75,6 +78,41 @@ def _repo_poller(
             exclude_authors=spec.exclude_authors,
             pushes=spec.pushes,
         )
+
+    return poll
+
+
+def _slack_poller(
+    spec: subscriptions.Subscription,
+    directory: Path,
+    me: str,
+    deliver: abc.Callable[[str], bool],
+) -> abc.Callable[[], object]:
+    """Raises ValueError for an unlisted channel and RuntimeError for a token Slack refuses,
+    which the scout tells the lemon once and retries."""
+    config = load_config().slack
+    channel, label = slack_config.resolve(config, spec.target[0])
+    thread = spec.target[1] if len(spec.target) > 1 else ""
+    client, base = slack_cli.open_client(config)
+    stem = slack_events.state_stem(directory, channel, thread, me)
+    attempts, retry_at = 0, 0.0
+
+    def poll() -> None:
+        nonlocal attempts, retry_at
+        if time.monotonic() < retry_at:
+            return
+
+        try:
+            slack_events.poll(stem, client, label, channel, thread, deliver, spec.me, base)
+        except slack_api.Unavailable as error:
+            _log.warning("Cannot read Slack for %s: %s", spec.source, error)
+            retry_at = time.monotonic() + slack_cli.delay(
+                attempts, spec.interval, error.retry_after
+            )
+            attempts += 1
+            return
+
+        attempts = 0
 
     return poll
 
@@ -149,6 +187,9 @@ def open_poller(
             notes,
         )
         return lambda: briefs_events.poll(watch, deliver)
+
+    if spec.kind == "slack":
+        return _slack_poller(spec, directory, me, deliver)
 
     settings = load_config().watch
     if spec.kind == "repo":
