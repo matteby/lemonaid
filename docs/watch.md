@@ -1,4 +1,4 @@
-# Watching documents, PRs, repos, and files
+# Watching documents, PRs, repos, files, and Slack
 
 `lemonaid watch doc` blocks until someone responds to a Markdown document through
 Relay Comments (inline CriticMarkup blocks written by an Obsidian plugin), and
@@ -319,6 +319,67 @@ lemonaid watch file --status notes.md --me "MotorHoe (Author)"
   are read every `--interval` seconds (5 by default).
 - What was last reported is kept per set of paths in the lemon's [cursors](#cursors), so a
   rearmed waiter reports anything that changed in between. The first waiter for a set of paths takes their current state as its baseline.
+
+## Watching Slack
+
+`lemonaid watch slack` waits for new messages in a Slack channel, or for new replies in one
+thread. It polls the Slack Web API outside the agent loop, so a quiet channel costs no model
+turns. It wakes Claude and Codex the same way the other watchers do.
+
+```bash
+lemonaid watch slack --wait my-hq --me "🍋 LemonAce" --once
+lemonaid watch slack --wait C0123ABCDEF --thread 1712345678.123456 --me "🍋 LemonAce" --codex-thread
+lemonaid watch slack --status my-hq
+```
+
+- Without `--thread`, it reports new top-level messages in the channel, including replies
+  also sent to the channel. It does not report replies inside threads.
+- With `--thread TS`, it reports new replies in the thread whose parent message has that
+  `ts`. To follow a conversation, start a thread watch for it.
+- Joins, leaves and other channel notices are skipped. So is a message whose text starts
+  with the `--me` signature, after an optional `🍋` or `:lemon:`. A lemon that posts with
+  its user's token cannot be told apart from that user any other way, so sign each post.
+- An event gives one line per message: the channel, the author's user ID, the time, the
+  text (whitespace collapsed, cut at 300 characters), the message's `ts` and a link. Reply
+  in the thread with that `ts` as `thread_ts`. Read the full message with your Slack tools.
+- Edited and deleted messages are not reported.
+- It makes one call per `--interval` (60 seconds by default): `conversations.history` for
+  a channel, `conversations.replies` for a thread. A rate limit waits out Slack's
+  `Retry-After`, and other failures back off and retry. A token or channel that Slack
+  refuses stops the waiter with exit 2.
+
+The first waiter takes the messages there now as seen. The cursor is the `ts` of the newest
+message reported, kept per channel and thread in the lemon's [cursors](#cursors), so a
+rearmed waiter reports what arrived in between. One waiter per channel, thread and lemon may
+run; `--once`, `--codex-thread`, `--status` and `--state-dir` work as in `watch pr`.
+
+### Setting up Slack
+
+1. Create a Slack app for your workspace at <https://api.slack.com/apps>, with the user
+   token scopes `channels:history` (public channels) and `groups:history` (private
+   channels). Add `im:history` or `mpim:history` only to watch direct messages.
+2. Install it to your workspace, and store the **User OAuth Token** (`xoxp-…`) where
+   `[slack]` can read it, for example in the macOS keychain:
+   `security add-generic-password -s lemonaid-slack -a "$USER" -w`.
+3. Configure lemonaid ([`[slack]`](config.md#slack)):
+
+```toml
+[slack]
+token_command = ["security", "find-generic-password", "-s", "lemonaid-slack", "-w"]
+
+[slack.channels]
+my-hq = "C0123ABCDEF"
+team-alerts = "C0456GHIJKL"
+```
+
+`watch slack` refuses a channel not listed in `[slack.channels]`. The list limits lemons,
+not the token: Slack scopes cover a type of conversation, so the token can read every
+channel its user can. A user token cannot read a private channel its user is not in.
+
+Slack counts its rate limit per method, per workspace and per app, so every watch through
+one app shares it. An internal app keeps Tier 3 (50 or more calls a minute). Since May 2025
+a commercially distributed app outside the Slack Marketplace gets 1 call a minute for these
+methods; such an app would need a longer `--interval`.
 
 ## Watching other lemons
 

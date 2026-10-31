@@ -1327,6 +1327,12 @@ Add `--ignore-removed` to wake only on arrivals and changes: a lemon that handle
 message by moving it into a subfolder (as `inbox watch` does into `done/`) is then not woken
 again by that removal.
 
+`lemonaid watch slack --wait <channel> [--thread <ts>] --me "<signature>" --once` waits for
+a new top-level message in a Slack channel, or with `--thread`, a new reply in that thread.
+The channel must be listed in `[slack.channels]` in the user's config. Messages starting with
+your `--me` signature are skipped, so sign each Slack post you make. Each line gives the
+message's `ts`; reply in its thread with that `ts`. Details: [watch.md](watch.md#watching-slack).
+
 ## Watching children
 
 `lemonaid watch briefs --children --self --once` waits for a direct child to enter

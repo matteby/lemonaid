@@ -23,7 +23,7 @@ from ..codex import channels
 from ..inbox import db
 from . import scout_roster, stop_sender, termination, waiter_lock
 
-KINDS = ("wait", "inbox", "pr", "repo", "doc", "file", "briefs")
+KINDS = ("wait", "inbox", "pr", "repo", "doc", "file", "briefs", "slack")
 
 
 @dataclasses.dataclass(frozen=True)

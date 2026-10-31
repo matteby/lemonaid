@@ -757,6 +757,28 @@ These filters do not affect submitted review bodies or PR conversation comments.
 wake = ["state", "conflict"]
 ```
 
+## `[slack]`
+
+`lemonaid watch slack` reads a Slack token and an allowlist of channels from this table. See [watch](watch.md#watching-slack) for creating the Slack app.
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `token_command` | `[]` | A command, as a list of words run without a shell, whose standard output is the token. Tried first. |
+| `token_env` | `"SLACK_USER_TOKEN"` | The environment variable that holds the token when `token_command` is not set. `SLACK_USER_TOKEN` is the variable `slack api` also reads. |
+
+`[slack.channels]` maps a name to a channel ID. `watch slack` accepts a channel by either, with or without `#`, and refuses any channel not listed; with no table it refuses every channel. The list limits what lemons watch, not what the token can read. An entry whose value is not a channel ID is ignored with a warning.
+
+```toml
+[slack]
+token_command = ["security", "find-generic-password", "-s", "lemonaid-slack", "-w"]
+
+[slack.channels]
+my-hq = "C0123ABCDEF"
+team-alerts = "C0456GHIJKL"
+```
+
+lemonaid keeps the token in memory. It never writes the token to a cursor, a log or an event, and a failing `token_command` is reported without its output.
+
 ## `[messages]`
 
 ```toml
