@@ -759,18 +759,22 @@ wake = ["state", "conflict"]
 
 ## `[slack]`
 
-`lemonaid watch slack` reads a Slack token and an allowlist of channels from this table. See [watch](watch.md#watching-slack) for creating the Slack app.
+`lemonaid slack login`, `lemonaid watch slack` and `lemonaid slack post` read the Slack app, the token and an allowlist of channels from this table. See [Slack](slack.md) for the app and signing in.
 
 | Key | Default | Description |
 |-----|---------|-------------|
+| `client_id` | `""` | The Slack app's client ID, which `lemonaid slack login` needs. A client ID is public. |
+| `redirect_port` | `8723` | The local port `lemonaid slack login` listens on for Slack's redirect. The app's redirect URLs must include `http://localhost:<port>/slack/oauth`. |
 | `token_command` | `[]` | A command, as a list of words run without a shell, whose standard output is the token. Tried first. |
 | `token_env` | `"SLACK_USER_TOKEN"` | The environment variable that holds the token when `token_command` is not set. `SLACK_USER_TOKEN` is the variable `slack api` also reads. |
 
-`[slack.channels]` maps a name to a channel ID. `watch slack` accepts a channel by either, with or without `#`, and refuses any channel not listed; with no table it refuses every channel. The list limits what lemons watch, not what the token can read. An entry whose value is not a channel ID is ignored with a warning.
+With neither `token_command` nor the variable set, lemonaid reads the macOS keychain item that `lemonaid slack login` wrote (service `lemonaid-slack`).
+
+`[slack.channels]` maps a name to a channel ID. `watch slack` and `slack post` accept a channel by either, with or without `#`, and refuse any channel not listed; with no table they refuse every channel. The list limits what lemons use, not what the token can read. An entry whose value is not a channel ID is ignored with a warning.
 
 ```toml
 [slack]
-token_command = ["security", "find-generic-password", "-s", "lemonaid-slack", "-w"]
+client_id = "1234567890.1234567890"
 
 [slack.channels]
 my-hq = "C0123ABCDEF"

@@ -33,6 +33,14 @@ THREAD = "1712345678.123456"
 TOKEN = "xoxp-not-a-real-token"
 
 
+@pytest.fixture(autouse=True)
+def _no_keychain(monkeypatch):
+    """The token falls back to the keychain; no test reads the real one."""
+    from lemonaid.slack import keychain
+
+    monkeypatch.setattr(keychain, "read", lambda *a, **k: "")
+
+
 def _m(ts, text="hi", user="U1", subtype="", thread_ts=""):
     return slack_api.Message(ts, user, text, subtype, thread_ts)
 
@@ -306,6 +314,17 @@ def test_the_token_falls_back_to_the_named_variable():
     assert slack_config.token(cfg, {"MY_SLACK": TOKEN}) == TOKEN
     with pytest.raises(slack_config.TokenError, match=r"\$MY_SLACK"):
         slack_config.token(cfg, {})
+
+
+def test_the_token_falls_back_to_the_keychain_item_login_wrote():
+    cfg = slack_config.SlackConfig()
+
+    assert slack_config.token(cfg, {}, stored=lambda: TOKEN) == TOKEN
+    assert slack_config.token(cfg, {"SLACK_USER_TOKEN": "xoxp-env"}, stored=lambda: TOKEN) == (
+        "xoxp-env"
+    )
+    with pytest.raises(slack_config.TokenError, match="slack login"):
+        slack_config.token(cfg, {}, stored=lambda: "")
 
 
 def test_a_failing_token_command_never_shows_its_output():

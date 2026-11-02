@@ -1,4 +1,4 @@
-"""Read a Slack channel's or thread's messages with the Web API, over urllib.
+"""Read a Slack channel's or thread's messages, and post to one, with the Web API over urllib.
 
 `conversations.history` and `conversations.replies` are Tier 3 ("50+ per minute") for an
 internal app, counted per method, per workspace and per app, so every watch through one
@@ -19,6 +19,7 @@ _REJECTIONS = frozenset(
     {
         "account_inactive",
         "channel_not_found",
+        "is_archived",
         "invalid_auth",
         "missing_scope",
         "no_permission",
@@ -131,6 +132,18 @@ class HttpClient:
     def workspace_url(self) -> str:
         """The workspace's URL from `auth.test`, which also checks the token."""
         return str(self._call("auth.test").get("url", ""))
+
+    def whoami(self) -> tuple[str, str, str]:
+        """The user's name, the workspace's name and its URL, from `auth.test`."""
+        body = self._call("auth.test")
+        return str(body.get("user", "")), str(body.get("team", "")), str(body.get("url", ""))
+
+    def post(self, channel: str, text: str, thread: str = "") -> str:
+        """Post *text* as the token's user with `chat.postMessage`; returns the new `ts`."""
+        params = {"channel": channel, "text": text}
+        if thread:
+            params["thread_ts"] = thread
+        return str(self._call("chat.postMessage", **params).get("ts", ""))
 
     def history(self, channel: str, oldest: str | None) -> list[Message]:
         """Top-level messages after *oldest*, newest first; with None, only the newest one."""

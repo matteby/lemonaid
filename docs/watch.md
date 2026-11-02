@@ -369,22 +369,21 @@ thread.
 
 ### Setting up Slack
 
-1. Create a Slack app for your workspace at <https://api.slack.com/apps>, with the user
-   token scopes `channels:history` (public channels) and `groups:history` (private
-   channels). Add `im:history` or `mpim:history` only to watch direct messages.
-2. Install it to your workspace, and store the **User OAuth Token** (`xoxp-…`) where
-   `[slack]` can read it, for example in the macOS keychain:
-   `security add-generic-password -s lemonaid-slack -a "$USER" -w`.
-3. Configure lemonaid ([`[slack]`](config.md#slack)):
+[Slack](slack.md) gives the workspace's app manifest. Each person adds the app's
+`client_id` and `[slack.channels]` to lemonaid's config, then runs `lemonaid slack login`
+once, which stores their user token in the macOS keychain:
 
 ```toml
 [slack]
-token_command = ["security", "find-generic-password", "-s", "lemonaid-slack", "-w"]
+client_id = "1234567890.1234567890"
 
 [slack.channels]
 my-hq = "C0123ABCDEF"
 team-alerts = "C0456GHIJKL"
 ```
+
+lemonaid reads the token from `[slack] token_command`, else `$SLACK_USER_TOKEN`, else the
+keychain item `lemonaid slack login` wrote ([`[slack]`](config.md#slack)).
 
 `watch slack` refuses a channel not listed in `[slack.channels]`. The list limits lemons,
 not the token: Slack scopes cover a type of conversation, so the token can read every

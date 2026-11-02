@@ -1334,6 +1334,14 @@ your `--me` signature are skipped, so sign each Slack post you make. Each line g
 message's `ts`; reply in its thread with that `ts`. As a `## Watching` line it joins your
 batch like the other sources. Details: [watch.md](watch.md#watching-slack).
 
+`lemonaid slack post <channel> [--thread <ts>] --me "<signature>" ["<text>"]` posts as the
+user to a channel in `[slack.channels]`, reading the text from standard input when the
+argument is absent. lemonaid adds your signature at the start, so your `watch slack --me`
+skips the post. It prints the new message's `ts` and link. Exit 1 means the post may have
+gone through: check the channel before you post again. Exit 2 means it did not post. If it
+says there is no Slack token, ask the user to run `lemonaid slack login`; never run it
+yourself. Details: [slack.md](slack.md#posting).
+
 ## Watching children
 
 `lemonaid watch briefs --children --self --once` waits for a direct child to enter

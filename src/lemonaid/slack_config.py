@@ -1,8 +1,9 @@
-"""The `[slack]` table: where the Slack token comes from, and the channels lemons may watch.
+"""The `[slack]` table: where the Slack token comes from, the app `lemonaid slack login`
+uses, and the channels lemons may watch or post in.
 
 The channel allowlist limits lemons, not the token. Slack scopes cover a type of
 conversation, so a token can read every channel its user can; `[slack.channels]` only
-keeps a lemon from watching one that is not listed. It also maps names to IDs, so a
+keeps a lemon from using one that is not listed. It also maps names to IDs, so a
 command can say `my-hq` without a lookup call.
 """
 
@@ -25,6 +26,8 @@ class SlackConfig:
     token_command: tuple[str, ...] = ()
     token_env: str = "SLACK_USER_TOKEN"
     channels: dict[str, str] = field(default_factory=dict)  # name -> channel ID
+    client_id: str = ""  # the org app's client ID, which is public
+    redirect_port: int = 8723
 
 
 def _warn(key: str, expected: str) -> None:
@@ -59,7 +62,17 @@ def parse(data: dict) -> SlackConfig:
     if not isinstance(env, str) or not env:
         _warn("token_env", "the name of an environment variable")
         env = SlackConfig.token_env
-    return SlackConfig(tuple(command), env, _channels(data.get("channels", {})))
+    client_id = data.get("client_id", "")
+    if not isinstance(client_id, str):
+        _warn("client_id", "a string, such as the app's 1234567890.1234567890")
+        client_id = ""
+    port = data.get("redirect_port", SlackConfig.redirect_port)
+    if isinstance(port, bool) or not isinstance(port, int) or not 1024 <= port <= 65535:
+        _warn("redirect_port", "a port number from 1024 to 65535")
+        port = SlackConfig.redirect_port
+    return SlackConfig(
+        tuple(command), env, _channels(data.get("channels", {})), client_id.strip(), port
+    )
 
 
 def resolve(config: SlackConfig, channel: str) -> tuple[str, str]:
@@ -83,8 +96,10 @@ def token(
     config: SlackConfig,
     environ: abc.Mapping[str, str] = os.environ,
     run: abc.Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    stored: abc.Callable[[], str] | None = None,
 ) -> str:
-    """The token from `token_command`, else from the `token_env` variable."""
+    """The token from `token_command`, else the `token_env` variable, else the keychain
+    item that `lemonaid slack login` wrote."""
     if config.token_command:
         try:
             done = run(list(config.token_command), capture_output=True, text=True, timeout=30)
@@ -100,6 +115,14 @@ def token(
     if value := environ.get(config.token_env, "").strip():
         return value
 
+    if stored is None:
+        from .slack import keychain
+
+        stored = keychain.read
+    if value := stored():
+        return value
+
     raise TokenError(
-        f"no Slack token: set [slack] token_command in lemonaid's config, or ${config.token_env}"
+        "no Slack token: run `lemonaid slack login`, or set [slack] token_command"
+        f" in lemonaid's config, or ${config.token_env}"
     )
