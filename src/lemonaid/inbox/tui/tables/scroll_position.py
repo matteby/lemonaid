@@ -1,12 +1,19 @@
-"""Keep the visible row in place while table data changes."""
+"""Keep the visible row in place while table data changes, and scroll for the wheel in batches."""
 
 import contextlib
 import functools
 import typing as ty
 from collections import abc
 
+from textual import events
 from textual.coordinate import Coordinate
+from textual.timer import Timer
 from textual.widgets import DataTable
+
+# The longest a wheel scroll waits to be drawn. Each scroll redraws the whole table, and a
+# fast wheel sends more events than a terminal behind tmux can draw: tmux then discards
+# its output and redraws the window in jumps.
+WHEEL_SECONDS = 1 / 15
 
 
 def _rows(table: DataTable) -> list[tuple[str, int, int]]:
@@ -20,6 +27,41 @@ def _rows(table: DataTable) -> list[tuple[str, int, int]]:
 
 class StableTable(DataTable):
     _preserving = False
+    _wheel_lines = 0.0
+    _wheel_timer: Timer | None = None
+
+    def _on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        self._wheel(event, self.app.scroll_sensitivity_y)
+
+    def _on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        self._wheel(event, -self.app.scroll_sensitivity_y)
+
+    def _wheel(self, event: events.MouseScrollDown | events.MouseScrollUp, lines: float) -> None:
+        """Add *lines* to the pending wheel scroll, which one timer draws for all of them.
+
+        Each event is clamped to the table's ends as Textual's own handler would clamp it, so
+        a reversal at an end lands where it would have unbatched. Like Textual's handler, a
+        wheel the table cannot scroll for bubbles to its parent. Shift and ctrl wheels scroll
+        sideways, and Textual's handler still does that.
+        """
+        if event.ctrl or event.shift or not self.allow_vertical_scroll:
+            return
+
+        event.prevent_default()  # Textual's handler would scroll now, ahead of the batch
+        pending = self.scroll_y + self._wheel_lines
+        target = min(max(pending + lines, 0), self.max_scroll_y)
+        if target == pending:
+            return
+
+        event.stop()
+        self._wheel_lines = target - self.scroll_y
+        if self._wheel_timer is None:
+            self._wheel_timer = self.set_timer(WHEEL_SECONDS, self._draw_wheel)
+
+    def _draw_wheel(self) -> None:
+        lines, self._wheel_lines, self._wheel_timer = self._wheel_lines, 0.0, None
+        if lines:
+            self.scroll_to(y=self.scroll_y + lines, animate=False)
 
     def _scroll_cursor_into_view(self, animate: bool = False) -> None:
         if not self._preserving:
